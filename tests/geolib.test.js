@@ -101,6 +101,13 @@
 		equal(box.minElev, 521.12, "minElev should be 521.12");
   });
 
+test("Testing conversion of lat/long/alt to NED: convertLlaToNed", function() {
+  var reference = {latitude: 89.9995, longitude: 0, elevation: 10};
+  var point = {latitude: 89.9995, longitude: 180, elevation: 10.00001};
+  console.log(geolib.convertLlaToNed(reference, point));
+  nearlyEqual(geolib.convertLlaToNed(reference, point), null);
+});
+
 	test("Testing bounding box: getBoundsDistance()", function() {
 		expect(6);
 		var point = {latitude: 34.090166, longitude: -118.276736555556};

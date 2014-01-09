@@ -1,7 +1,8 @@
 /*global console:true geolib:true require:true module:true window:true global:true define:true*/
 (function (global, undefined) {
 
-	var radius = 6378137; // Earth radius
+	var radius = 6378137; // Earth radius in meters.
+        var flattening = 298.257223563;
 	var sexagesimalPattern = /^([0-9]{1,3})°\s*([0-9]{1,3})'\s*(([0-9]{1,3}(\.([0-9]{1,2}))?)"\s*)?([NEOSW]?)$/;
 	var MIN_LAT = -90;
 	var MAX_LAT = 90;
@@ -358,6 +359,46 @@
 			}
 			return stats;
 		},
+
+          // Convert lat, lon, height in WGS84 to ECEF X,Y,Z
+          convertLlatoEcef: function(point) {
+            var keys = geolib.getKeys(point);
+            var lat = geolib.useDecimal(point[keys.latitude]).toRad();
+            var lon = geolib.useDecimal(point[keys.longitude]).toRad();
+            var alt = point[keys.elevation];
+            var a = radius; // earth semimajor axis in meters
+            var f = 1 / flattening; // reciprocal flattening
+            var e2 = 2 * f - f * f; // eccentricity squared
+            var chi = Math.sqrt(1 - e2 * Math.pow(Math.sin(lat), 2));
+            var X = (a / chi + alt) * Math.cos(lat) * Math.cos(lon);
+            var Y = (a / chi + alt) * Math.cos(lat) * Math.sin(lon);
+            var Z = (a * (1 - e2) / chi + alt) * Math.sin(lat);
+            return [X, Y, Z];
+          },
+
+          convertLlaToNed: function(reference, point) {
+            var ecef = geolib.convertLlatoEcef(point);
+            var X = ecef[0];
+            var Y = ecef[1];
+            var Z = ecef[2];
+            var ecefRef = geolib.convertLlatoEcef(reference);
+            var Xr = ecefRef[0];
+            var Yr = ecefRef[1];
+            var Zr = ecefRef[2];
+
+            // convert ECEF coordinates to local east, north, up (x,y,z)
+            var phiP = Math.atan2(Zr, Math.sqrt(Xr * Xr + Yr * Yr));
+            var lambda = Math.atan2(Yr, Xr);
+
+            var x1 = -Math.sin(lambda) * (X - Xr) + Math.cos(lambda) * (Y - Yr);
+            var y1 = (-Math.sin(phiP) * Math.cos(lambda) * (X-Xr) -
+                      Math.sin(phiP) * Math.sin(lambda) * (Y - Yr) +
+                      Math.cos(phiP) * (Z - Zr));
+            var z1 = (Math.cos(phiP) * Math.cos(lambda) * (X - Xr) +
+                      Math.cos(phiP) * Math.sin(lambda) * (Y - Yr) +
+                      Math.sin(phiP) * (Z - Zr));
+            return [y1, x1, -z1];
+          },
 
 		/**
 		* Computes the bounding coordinates of all points on the surface
